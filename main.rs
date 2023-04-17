@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::*;
 use std::env;
-use std::vec;
 
 fn read_file(file_name: &str) -> String {
     let mut file = File::open(file_name)
