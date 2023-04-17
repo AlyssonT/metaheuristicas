@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::*;
 use std::env;
+use std::vec;
 
 fn read_file(file_name: &str) -> String {
     let mut file = File::open(file_name)
@@ -13,6 +14,7 @@ fn read_file(file_name: &str) -> String {
     content
 }
 
+#[derive(Debug)]
 struct City {
     x: f64,
     y: f64,
@@ -85,9 +87,41 @@ impl Instance {
                 }
             }
         }
+        solution.pop();
         evaluation
     }
+
+    fn greedy(&self) -> Vec<usize> {
+        let number_cities = self.cities.len();
+        let mut solution = vec![0];
+        let mut visited = vec![false; number_cities];
+        visited[0] = true;
+        let mut current = 0;
+        let mut min_distance = i32::MAX;
+        let mut current_distance: i32 = 0;
+        let mut next_city: usize = 0;
+        for _i in 0..(number_cities-1) {
+            for j in 0..number_cities {
+                if !visited[j] {
+                    current_distance = City::calculate_distance(&self.cities[current], &self.cities[j]);
+                    if current_distance < min_distance {
+                        min_distance = current_distance;
+                        next_city = j;
+                    }
+
+                }
+            }
+            visited[next_city] = true;
+            solution.push(next_city);
+            current = next_city;
+            min_distance = i32::MAX;
+            
+        }
+        solution
+    }
 }
+
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -101,6 +135,11 @@ fn main() {
 
     instance.set_data(tspp_file_name, matrix_file_name);
 
+    /*  Solução sequencial 
+
     let mut solution: Vec<usize> = (0..instance.cities.len()).collect();
+    */
+
+    let mut solution = instance.greedy();
     println!("{}", instance.evaluate(&mut solution));
 }
