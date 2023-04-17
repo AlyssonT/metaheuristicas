@@ -1,15 +1,6 @@
 use std::fs::File;
 use std::io::*;
-
-#[derive(Debug)]
-struct City {
-    x: f64,
-    y: f64,
-}
-
-fn calculate_distance(c1: &City, c2: &City) -> i32 {
-    ((c2.x-c1.x)*(c2.x-c1.x) + (c2.y-c1.y)*(c2.y-c1.y)).sqrt().round() as i32
-}
+use std::env;
 
 fn read_file(file_name: &str) -> String {
     let mut file = File::open(file_name)
@@ -22,52 +13,94 @@ fn read_file(file_name: &str) -> String {
     content
 }
 
-fn main() {
-    let file_name = "st70.tspp";
-    let matrix_file_name = "st70-mix2.txt";
+struct City {
+    x: f64,
+    y: f64,
+}
 
-    let content = read_file(file_name);
-    let matrix_content = read_file(matrix_file_name);
+impl City {
+    pub fn calculate_distance(c1: &City, c2: &City) -> i32 {
+        ((c2.x-c1.x)*(c2.x-c1.x) + (c2.y-c1.y)*(c2.y-c1.y)).sqrt().round() as i32
+    } 
+}
 
-    let matrix_content_lines: Vec<Vec<&str>> = matrix_content.lines()
-        .map(|line| line.split_whitespace().collect()).collect();
+struct Instance {
+    matrix: Vec<Vec<i32>>,
+    cities: Vec<City>,
+}
 
-    let mut matrix: Vec<Vec<i32>> = Vec::new();
-    for i in 1..matrix_content_lines.len() {
-        matrix.push(vec![]);
-        matrix_content_lines[i].iter()
-            .for_each(|value| matrix[i-1].push(value.parse::<i32>().unwrap_or(0)));
+impl Instance {
+    fn new() -> Self {
+        Self {
+            matrix: Vec::new(),
+            cities: Vec::new(),
+        }
     }
 
-    let lines: Vec<Vec<&str>> = content.lines()
-        .map(|line| line.split_whitespace().collect()).collect();
-
-    let mut cities: Vec<City> = Vec::new();
-
-    for i in 1..lines.len() {
-        let xf: f64 = lines[i][1].parse().expect("Erro ao converter numero");
-        let yf: f64 = lines[i][2].parse().expect("Erro ao converter numero");
-
-        let city = City {
-            x: xf,
-            y: yf,
+    fn set_data(&mut self, tspp_file_name: &str, matrix_file_name: Option<&str>) {
+        let content = read_file(tspp_file_name);
+        let matrix_content = match matrix_file_name {
+            Some(text) => read_file(text),
+            None => "".to_string(),
         };
+    
+        if matrix_content.len() > 0 {
+            let matrix_content_lines: Vec<Vec<&str>> = matrix_content.lines()
+                .map(|line| line.split_whitespace().collect()).collect();
 
-        cities.push(city);
+            for i in 1..matrix_content_lines.len() {
+                self.matrix.push(vec![]);
+                matrix_content_lines[i].iter()
+                    .for_each(|value| self.matrix[i-1].push(value.parse::<i32>().unwrap_or(0)));
+            }
+        }
+    
+        let lines: Vec<Vec<&str>> = content.lines()
+            .map(|line| line.split_whitespace().collect()).collect();
+    
+        for i in 1..lines.len() {
+            let xf: f64 = lines[i][1].parse().unwrap_or(0.0);
+            let yf: f64 = lines[i][2].parse().unwrap_or(0.0);
+    
+            let city = City {
+                x: xf,
+                y: yf,
+            };
+    
+            self.cities.push(city);
+        }
     }
 
-    let mut solution: Vec<usize> = (0..cities.len()).collect();
-    solution.push(0);
-    let mut evaluation = 0;
-    for i in 0..(solution.len()-1) {
-        evaluation += calculate_distance(&cities[solution[i]], &cities[solution[i+1]]);
-        if i==0 {
-            evaluation += matrix[solution[0]][0];
+    fn evaluate(&self, solution: &mut Vec<usize>) -> i32 {
+        solution.push(solution[0]);
+        let mut evaluation = 0;
+        for i in 0..(solution.len()-1) {
+            evaluation += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[i+1]]);
+            if self.matrix.len() > 0 {
+                if i==0 {
+                    evaluation += self.matrix[solution[0]][0];
+                }
+                if i<solution.len()-2 {
+                    evaluation += self.matrix[solution[i+1]][i+1];
+                }
+            }
         }
-        if i<solution.len()-2 {
-            evaluation += matrix[solution[i+1]][i+1];
-        }
+        evaluation
     }
+}
 
-    println!("{}", evaluation);
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut instance = Instance::new();
+    let tspp_file_name = args[1].as_str();
+    let matrix_file_name = match args.len() {
+        3 => Some(args[2].as_str()),
+        _ => None,
+    };
+
+    instance.set_data(tspp_file_name, matrix_file_name);
+
+    let mut solution: Vec<usize> = (0..instance.cities.len()).collect();
+    println!("{}", instance.evaluate(&mut solution));
 }
