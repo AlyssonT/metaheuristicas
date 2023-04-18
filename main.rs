@@ -75,7 +75,6 @@ impl Instance {
     fn evaluate(&self, solution: &Vec<usize>) -> i32 {
         let mut solution_copy = solution.clone();
         solution_copy.push(solution[0]);
-        println!("{:?}", solution_copy);
         let mut evaluation = 0;
         for i in 0..(solution_copy.len()-1) {
             evaluation += City::calculate_distance(&self.cities[solution_copy[i]], &self.cities[solution_copy[i+1]]);
@@ -126,7 +125,7 @@ impl Instance {
         let mut visited = vec![false; number_cities];
         visited[0] = true;
         let mut current = 0;
-        let mut current2 = 0;
+        let mut current_back = 0;
         let mut min_distance = i32::MAX;
         let mut current_distance: i32;
         let mut next_city: usize = 0;
@@ -144,9 +143,9 @@ impl Instance {
                 }
             }
             for j in 0..number_cities {
-                if current == current2  {break}
+                if current == current_back  {break}
                 if !visited[j] {
-                    current_distance = City::calculate_distance(&self.cities[current2], &self.cities[j]);
+                    current_distance = City::calculate_distance(&self.cities[current_back], &self.cities[j]);
                     if current_distance < min_distance {
                         min_distance = current_distance;
                         next_city = j;
@@ -155,14 +154,14 @@ impl Instance {
 
                 }
             }
-            visited[next_city] = true;
             if pushed_in_front {
                 current = next_city;
                 solution_front.push(next_city);
             } else {
-                current2 = next_city;
+                current_back = next_city;
                 solution_back.push(next_city);
             }
+            visited[next_city] = true;
             min_distance = i32::MAX;
         }
         let mut solution = vec![];
