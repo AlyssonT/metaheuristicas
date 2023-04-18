@@ -90,6 +90,10 @@ impl Instance {
         evaluation
     }
 
+    fn sequential(&self) -> Vec<usize> {
+        (0..self.cities.len()).collect()
+    }
+
     fn greedy(&self) -> Vec<usize> {
         let number_cities = self.cities.len();
         let mut solution = vec![0];
@@ -183,13 +187,13 @@ fn main() {
     let mut instance = Instance::new();
     let tspp_file_name = args[1].as_str();
     let matrix_file_name = match args.len() {
-        3 => Some(args[2].as_str()),
+        3..=usize::MAX => Some(args[2].as_str()),
         _ => None,
     };
 
     instance.set_data(tspp_file_name, matrix_file_name);
 
-    let sequential: Vec<usize> = (0..instance.cities.len()).collect();
+    let sequential = instance.sequential();
     let solution = instance.greedy();
     let solution_2_way = instance.greedy_2_way();
     println!("Sequential: {}", instance.evaluate(&sequential));
