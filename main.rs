@@ -72,21 +72,22 @@ impl Instance {
         }
     }
 
-    fn evaluate(&self, solution: &mut Vec<usize>) -> i32 {
-        solution.push(solution[0]);
+    fn evaluate(&self, solution: &Vec<usize>) -> i32 {
+        let mut solution_copy = solution.clone();
+        solution_copy.push(solution[0]);
+        println!("{:?}", solution_copy);
         let mut evaluation = 0;
-        for i in 0..(solution.len()-1) {
-            evaluation += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[i+1]]);
+        for i in 0..(solution_copy.len()-1) {
+            evaluation += City::calculate_distance(&self.cities[solution_copy[i]], &self.cities[solution_copy[i+1]]);
             if self.matrix.len() > 0 {
                 if i==0 {
-                    evaluation += self.matrix[solution[0]][0];
+                    evaluation += self.matrix[solution_copy[0]][0];
                 }
-                if i<solution.len()-2 {
-                    evaluation += self.matrix[solution[i+1]][i+1];
+                if i<solution_copy.len()-2 {
+                    evaluation += self.matrix[solution_copy[i+1]][i+1];
                 }
             }
         }
-        solution.pop();
         evaluation
     }
 
@@ -97,7 +98,7 @@ impl Instance {
         visited[0] = true;
         let mut current = 0;
         let mut min_distance = i32::MAX;
-        let mut current_distance: i32 = 0;
+        let mut current_distance: i32;
         let mut next_city: usize = 0;
         for _i in 0..(number_cities-1) {
             for j in 0..number_cities {
@@ -114,7 +115,62 @@ impl Instance {
             solution.push(next_city);
             current = next_city;
             min_distance = i32::MAX;
-            
+        }
+        solution
+    }
+
+    fn greedy_2_way(&self) -> Vec<usize> {
+        let number_cities = self.cities.len();
+        let mut solution_front = vec![0];
+        let mut solution_back: Vec<usize> = vec![];
+        let mut visited = vec![false; number_cities];
+        visited[0] = true;
+        let mut current = 0;
+        let mut current2 = 0;
+        let mut min_distance = i32::MAX;
+        let mut current_distance: i32;
+        let mut next_city: usize = 0;
+        let mut pushed_in_front: bool = true;
+        for _ in 0..(number_cities-1) {
+            for j in 0..number_cities {
+                if !visited[j] {
+                    current_distance = City::calculate_distance(&self.cities[current], &self.cities[j]);
+                    if current_distance < min_distance {
+                        min_distance = current_distance;
+                        next_city = j;
+                        pushed_in_front = true;
+                    }
+
+                }
+            }
+            for j in 0..number_cities {
+                if current == current2  {break}
+                if !visited[j] {
+                    current_distance = City::calculate_distance(&self.cities[current2], &self.cities[j]);
+                    if current_distance < min_distance {
+                        min_distance = current_distance;
+                        next_city = j;
+                        pushed_in_front = false;
+                    }
+
+                }
+            }
+            visited[next_city] = true;
+            if pushed_in_front {
+                current = next_city;
+                solution_front.push(next_city);
+            } else {
+                current2 = next_city;
+                solution_back.push(next_city);
+            }
+            min_distance = i32::MAX;
+        }
+        let mut solution = vec![];
+        for &city in solution_back.iter().rev() {
+            solution.push(city);
+        }
+        for city in solution_front {
+            solution.push(city);
         }
         solution
     }
@@ -134,11 +190,10 @@ fn main() {
 
     instance.set_data(tspp_file_name, matrix_file_name);
 
-    /*  Solução sequencial 
-
-    let mut solution: Vec<usize> = (0..instance.cities.len()).collect();
-    */
-
-    let mut solution = instance.greedy();
-    println!("{}", instance.evaluate(&mut solution));
+    let sequential: Vec<usize> = (0..instance.cities.len()).collect();
+    let solution = instance.greedy();
+    let solution_2_way = instance.greedy_2_way();
+    println!("Sequential: {}", instance.evaluate(&sequential));
+    println!("Greedy: {}", instance.evaluate(&solution));
+    println!("Greedy_2_way: {}", instance.evaluate(&solution_2_way));
 }
