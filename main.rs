@@ -177,16 +177,44 @@ impl Instance {
         }
         solution
     }
-}
 
-fn localSearch(init: &Vec<usize>) -> Vec<usize> {
-    let mut solution = init.clone();
-    for i in 1..solution.len() {
-        for j in i+1..solution.len() {
-            
+    fn local_search(&self, init: &Vec<usize>) -> Vec<usize> {
+        let mut solution = init.clone();
+        let mut better_option: Vec<usize> = vec![];
+        let mut eval_first = self.evaluate(&mut solution);
+        let mut eval_temp: i32;
+        let mut eval_better_option: i32 = i32::MAX;
+        loop {
+            for i in 1..solution.len()-3 {
+                for j in i+1..solution.len()-1 {
+                    eval_temp = eval_first;
+                    eval_temp -= City::calculate_distance(&self.cities[solution[i-1]], &self.cities[solution[i]]);
+                    eval_temp += City::calculate_distance(&self.cities[solution[i-1]], &self.cities[solution[j]]);
+                    if j==solution.len()-1 {
+                        eval_temp -= City::calculate_distance(&self.cities[solution[j]], &self.cities[solution[0]]);
+                        eval_temp += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[0]]);
+                    } else {
+                        eval_temp -= City::calculate_distance(&self.cities[solution[j]], &self.cities[solution[j+1]]);
+                        eval_temp += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[j+1]]);
+                    }
+
+                    if eval_temp < eval_better_option {
+                        better_option = solution.clone();
+                        better_option[i..=j].reverse();
+                        eval_better_option = eval_temp;
+                    }
+                }
+            }
+            if eval_better_option < eval_first {
+                solution = better_option;
+                better_option = vec![];
+                eval_first = self.evaluate(&mut solution);
+                eval_better_option = i32::MAX;
+            } else {
+                return solution;
+            }
         }
     }
-    ()
 }
 
 fn main() {
@@ -204,11 +232,18 @@ fn main() {
     let mut solution_sequential = instance.sequential();
     let mut solution_greedy = instance.greedy();
     let mut solution_2_way = instance.greedy_2_way();
-    let mut solution_LS_init_sequential = localSearch(&solution_sequential);
-    let mut solution_LS_init_greedy = localSearch(&solution_greedy);
-    let mut solution_LS_init_greedy_2_way = localSearch(&solution_2_way);
+    let mut solution_ls_init_sequential = instance.local_search(&solution_sequential);
+    let mut solution_ls_init_greedy = instance.local_search(&solution_greedy);
+    let mut solution_ls_init_greedy_2_way = instance.local_search(&solution_2_way);
 
     println!("Sequential: {}", instance.evaluate(&mut solution_sequential));
     println!("Greedy: {}", instance.evaluate(&mut solution_greedy));
     println!("Greedy_2_way: {}", instance.evaluate(&mut solution_2_way));
+
+    println!("\n{:?}", solution_ls_init_sequential);
+    println!("Local Search (init: Sequential): {}\n", instance.evaluate(&mut solution_ls_init_sequential));
+    println!("{:?}", solution_ls_init_greedy);
+    println!("Local Search (init: Greedy): {}\n", instance.evaluate(&mut solution_ls_init_greedy));
+    println!("{:?}", solution_ls_init_greedy_2_way);
+    println!("Local Search (init: Greedy_2_way): {}\n", instance.evaluate(&mut solution_ls_init_greedy_2_way));
 }
