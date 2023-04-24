@@ -72,21 +72,21 @@ impl Instance {
         }
     }
 
-    fn evaluate(&self, solution: &Vec<usize>) -> i32 {
-        let mut solution_copy = solution.clone();
-        solution_copy.push(solution[0]);
+    fn evaluate(&self, solution: &mut Vec<usize>) -> i32 {
+        solution.push(solution[0]);
         let mut evaluation = 0;
-        for i in 0..(solution_copy.len()-1) {
-            evaluation += City::calculate_distance(&self.cities[solution_copy[i]], &self.cities[solution_copy[i+1]]);
+        for i in 0..(solution.len()-1) {
+            evaluation += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[i+1]]);
             if self.matrix.len() > 0 {
                 if i==0 {
-                    evaluation += self.matrix[solution_copy[0]][0];
+                    evaluation += self.matrix[solution[0]][0];
                 }
-                if i<solution_copy.len()-2 {
-                    evaluation += self.matrix[solution_copy[i+1]][i+1];
+                if i<solution.len()-2 {
+                    evaluation += self.matrix[solution[i+1]][i+1];
                 }
             }
         }
+        solution.pop();
         evaluation
     }
 
@@ -179,7 +179,15 @@ impl Instance {
     }
 }
 
-
+fn localSearch(init: &Vec<usize>) -> Vec<usize> {
+    let mut solution = init.clone();
+    for i in 1..solution.len() {
+        for j in i+1..solution.len() {
+            
+        }
+    }
+    ()
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -193,10 +201,14 @@ fn main() {
 
     instance.set_data(tspp_file_name, matrix_file_name);
 
-    let sequential = instance.sequential();
-    let solution = instance.greedy();
-    let solution_2_way = instance.greedy_2_way();
-    println!("Sequential: {}", instance.evaluate(&sequential));
-    println!("Greedy: {}", instance.evaluate(&solution));
-    println!("Greedy_2_way: {}", instance.evaluate(&solution_2_way));
+    let mut solution_sequential = instance.sequential();
+    let mut solution_greedy = instance.greedy();
+    let mut solution_2_way = instance.greedy_2_way();
+    let mut solution_LS_init_sequential = localSearch(&solution_sequential);
+    let mut solution_LS_init_greedy = localSearch(&solution_greedy);
+    let mut solution_LS_init_greedy_2_way = localSearch(&solution_2_way);
+
+    println!("Sequential: {}", instance.evaluate(&mut solution_sequential));
+    println!("Greedy: {}", instance.evaluate(&mut solution_greedy));
+    println!("Greedy_2_way: {}", instance.evaluate(&mut solution_2_way));
 }
