@@ -28,6 +28,7 @@ impl City {
 struct Instance {
     matrix: Vec<Vec<i32>>,
     cities: Vec<City>,
+    distances: Vec<Vec<i32>>,
 }
 
 impl Instance {
@@ -35,6 +36,7 @@ impl Instance {
         Self {
             matrix: Vec::new(),
             cities: Vec::new(),
+            distances: Vec::new(),
         }
     }
 
@@ -70,13 +72,23 @@ impl Instance {
     
             self.cities.push(city);
         }
+
+        let mut distance: i32;
+        self.distances = vec![vec![0; self.cities.len()]; self.cities.len()];
+        for i in 0..self.cities.len() {
+            for j in i+1..self.cities.len() {
+                distance = City::calculate_distance(&self.cities[i], &self.cities[j]);
+                self.distances[i][j] = distance;
+                self.distances[j][i] = distance;
+            }
+        }
     }
 
     fn evaluate(&self, solution: &mut Vec<usize>) -> i32 {
         solution.push(solution[0]);
         let mut evaluation = 0;
         for i in 0..(solution.len()-1) {
-            evaluation += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[i+1]]);
+            evaluation += self.distances[solution[i]][solution[i+1]];
             if self.matrix.len() > 0 {
                 if i==0 {
                     evaluation += self.matrix[solution[0]][0];
@@ -106,7 +118,7 @@ impl Instance {
         for _i in 0..(number_cities-1) {
             for j in 0..number_cities {
                 if !visited[j] {
-                    current_distance = City::calculate_distance(&self.cities[current], &self.cities[j]);
+                    current_distance = self.distances[current][j];
                     if current_distance < min_distance {
                         min_distance = current_distance;
                         next_city = j;
@@ -137,7 +149,7 @@ impl Instance {
         for _ in 0..(number_cities-1) {
             for j in 0..number_cities {
                 if !visited[j] {
-                    current_distance = City::calculate_distance(&self.cities[current], &self.cities[j]);
+                    current_distance = self.distances[current][j];
                     if current_distance < min_distance {
                         min_distance = current_distance;
                         next_city = j;
@@ -149,7 +161,7 @@ impl Instance {
             for j in 0..number_cities {
                 if current == current_back  {break}
                 if !visited[j] {
-                    current_distance = City::calculate_distance(&self.cities[current_back], &self.cities[j]);
+                    current_distance = self.distances[current_back][j];
                     if current_distance < min_distance {
                         min_distance = current_distance;
                         next_city = j;
@@ -180,27 +192,42 @@ impl Instance {
 
     fn local_search(&self, init: &Vec<usize>) -> Vec<usize> {
         let mut solution = init.clone();
+        let mut solution_temp: Vec<usize> = vec![];
         let mut better_option: Vec<usize> = vec![];
         let mut eval_first = self.evaluate(&mut solution);
         let mut eval_temp: i32;
         let mut eval_better_option: i32 = i32::MAX;
+        let has_penalty = self.matrix.len() > 0;
+        let size = solution.len();
         loop {
-            for i in 1..solution.len()-3 {
-                for j in i+1..solution.len()-1 {
-                    eval_temp = eval_first;
-                    eval_temp -= City::calculate_distance(&self.cities[solution[i-1]], &self.cities[solution[i]]);
-                    eval_temp += City::calculate_distance(&self.cities[solution[i-1]], &self.cities[solution[j]]);
-                    if j==solution.len()-1 {
-                        eval_temp -= City::calculate_distance(&self.cities[solution[j]], &self.cities[solution[0]]);
-                        eval_temp += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[0]]);
+            for i in 1..size-1 {
+                for j in i+1..size {
+                    if has_penalty {
+                        solution_temp = solution.clone();
+                        solution_temp[i..=j].reverse();
+                        eval_temp = self.evaluate(&mut solution_temp);
                     } else {
-                        eval_temp -= City::calculate_distance(&self.cities[solution[j]], &self.cities[solution[j+1]]);
-                        eval_temp += City::calculate_distance(&self.cities[solution[i]], &self.cities[solution[j+1]]);
+                        eval_temp = eval_first;
+                        eval_temp -= self.distances[solution[i-1]][solution[i]];
+                        eval_temp += self.distances[solution[i-1]][solution[j]];
+                        if j==size-1 {
+                            eval_temp -= self.distances[solution[j]][solution[0]];
+                            eval_temp += self.distances[solution[i]][solution[0]];
+                        } else {
+                            eval_temp -= self.distances[solution[j]][solution[j+1]];
+                            eval_temp += self.distances[solution[i]][solution[j+1]];
+                        }
                     }
-
                     if eval_temp < eval_better_option {
-                        better_option = solution.clone();
-                        better_option[i..=j].reverse();
+                        if has_penalty {
+                            better_option = solution_temp;
+                            solution_temp = vec![];
+                        }
+                        else {
+                            better_option = solution.clone();
+                            better_option[i..=j].reverse();
+                        }
+                        
                         eval_better_option = eval_temp;
                     }
                 }
