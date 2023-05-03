@@ -247,6 +247,10 @@ impl Instance {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
+    if args.len() < 2 { 
+        println!("Nenhum arquivo especificado");
+        return;    
+    }
     let mut instance = Instance::new();
     let tspp_file_name = args[1].as_str();
     let matrix_file_name = match args.len() {
