@@ -238,6 +238,7 @@ impl Instance {
                 better_option = vec![];
                 eval_first = self.evaluate(&mut solution);
                 eval_better_option = i32::MAX;
+                println!("nao eh que deu, meu");
             } else {
                 return solution;
             }
@@ -255,13 +256,13 @@ impl Instance {
         let mut eval_best_solution = self.evaluate(&mut best_solution);
         let mut current_distances: Vec<(usize, &i32)>;
 
-        for i in 0..100 {
+        for i in 0..500 {
             current_distances = self.distances[current].iter().enumerate()
                     .filter(|&c| !visited[c.0])
                     .collect();
             while !current_distances.is_empty() {
                 current_distances.sort_by(|a,b| a.1.cmp(b.1));
-                choice = rng.gen_range(0..=((current_distances.len() as f64 * 0.2).floor() as usize));
+                choice = rng.gen_range(0..=((current_distances.len() as f64 * 0.1).floor() as usize));
                 let next_city = current_distances[choice].0;
                 visited[next_city] = true;
                 solution.push(next_city);
@@ -272,18 +273,66 @@ impl Instance {
                     .collect();
             }
 
-            solution = self.local_search(&solution);
-            if eval_best_solution > self.evaluate(&mut solution) {
-                best_solution = solution;
+            let mut new_solution = self.local_search(&solution);
+            if eval_best_solution > self.evaluate(&mut new_solution) {
+                best_solution = new_solution;
                 eval_best_solution = self.evaluate(&mut best_solution);
             }
             current = rng.gen_range(0..self.cities.len());
-            solution = vec![current];
-            visited = vec![false; self.cities.len()];
+            solution.clear();
+            solution.push(current);
+            visited.fill(false);
             visited[current] = true;
             println!("{}", i);
         }
         best_solution
+    }
+
+    fn sa(&self) -> Vec<usize> {
+        let mut rng = rand::thread_rng();
+        let mut solution = self.greedy();
+        let mut eval_solution: i32;
+        let mut best_solution = solution.clone();
+        let mut eval_best: i32 = self.evaluate(&mut best_solution);
+        let mut neighbor: Vec<usize>;
+        let mut eval_neighbor: i32;
+        let mut temperature = 1000.0;
+        let alfa = 0.999;
+        let freeze = 0.01;
+        let mut delta: i32;
+        while temperature > freeze {
+            
+            let mut i: usize; let mut j: usize;
+            for _ in 0..1000 {
+                eval_solution = self.evaluate(&mut solution);
+                i = rng.gen_range(0..solution.len());
+                j = rng.gen_range(0..solution.len());
+                while i == j {
+                    j = rng.gen_range(0..solution.len());
+                }
+                if i > j { (i,j) = (j,i); }
+                neighbor = solution.clone();
+                neighbor[i..=j].reverse();
+                eval_neighbor = self.evaluate(&mut neighbor);
+                delta = eval_neighbor - eval_solution;
+                if delta < 0 {
+                    solution = neighbor;
+                    if eval_neighbor < eval_best {
+                        best_solution = solution.clone();
+                        eval_best = self.evaluate(&mut best_solution);
+                    }
+                } else {
+                    let x = rng.gen_range(0.0..=1.0);
+                    let e: f64 = 2.7182818284590452353602874713527;
+                    //println!("{}", e.powf((-delta as f64) / temperature));
+                    if x < (e.powf((-delta as f64) / temperature)) {
+                        solution = neighbor;
+                    } 
+                }
+            }
+            temperature *= alfa;
+        }
+        self.local_search(&best_solution)
     }
 }
 
@@ -303,7 +352,12 @@ fn main() {
 
     instance.set_data(tspp_file_name, matrix_file_name);
 
-    let mut solution = instance.grasp();
-    println!("{:?}", solution);
-    println!("{:?}", instance.evaluate(&mut solution));
+    // let mut solution = instance.grasp();
+    // println!("GRASP:");
+    // println!("{:?}", solution);
+    // println!("{:?}", instance.evaluate(&mut solution));
+    println!("\nSA:");
+    let mut sa_solution = instance.sa();
+    println!("{:?}", sa_solution);
+    println!("{}", instance.evaluate(&mut sa_solution));
 }
