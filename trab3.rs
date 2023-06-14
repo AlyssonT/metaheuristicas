@@ -21,6 +21,46 @@ fn distance(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
     (dx * dx + dy * dy).sqrt()
 }
 
+fn interception_point(ct: f64, target_x: f64, target_y: f64, agent_x: f64, agent_y: f64, agent_speed: f64, tx_speed: f64, ty_speed:f64) -> (f64, f64) {
+    let mut dist = f64::INFINITY;
+    let mut dt: f64;
+    let mut ds: f64;
+    let mut next_target_x = target_x + tx_speed*ct;
+    let mut next_target_y = target_y + ty_speed*ct;
+    let mut prev_target_x: f64;
+    let mut prev_target_y: f64;
+
+    while dist > 10e-7 {
+        ds = distance(agent_x, agent_y, next_target_x, next_target_y);
+        dt = ds/agent_speed;
+        prev_target_x = next_target_x;
+        prev_target_y = next_target_y;
+        next_target_x = target_x + tx_speed*(ct + dt);
+        next_target_y = target_y + ty_speed*(ct + dt);
+        dist = distance(prev_target_x, prev_target_y, next_target_x, next_target_y);
+    }
+    (next_target_x, next_target_y)
+}
+
+fn select_random_index(v: &Vec<(usize, &f64)>) -> usize {
+    let mut rng = rand::thread_rng();
+    let total: f64 = v.iter().map(|&(_, val)| val).sum();
+
+    if total == 0.0 {
+        return v[rng.gen_range(0..v.len())].0;
+    }
+
+    let mut rand_value = rng.gen_range(0.0..=total);
+
+    for &(i, &value) in v.iter() {
+        if rand_value < value {
+            return i;
+        }
+        rand_value -= value;
+    }
+    return 0;
+}
+
 #[derive(Clone, Copy)]
 struct Target {
     x: f64,
@@ -31,11 +71,55 @@ struct Target {
 }
 
 struct Ant {
-    solution: Vec<usize>,
+    trail: Vec<usize>,
+}
+
+impl Ant {
+    fn new() -> Self {
+        Self {
+            trail: Vec::new(),
+        }
+    }
 }
 
 struct Colony {
+    pheromones: Vec<Vec<f64>>,
+    ants: Vec<Ant>,
+}
 
+impl Colony {
+    fn new(n: usize) -> Self {
+        let mut ants: Vec<Ant> = vec![];
+        for _ in 0..10 {
+            ants.push(Ant::new());
+        }
+        Self {
+            pheromones: vec![vec![0.0; n]; n],
+            ants,
+        }
+    }
+
+    fn create_trails(&mut self) {
+        let mut visited = vec![false; self.pheromones.len()];
+        for ant in &mut self.ants {
+            let mut which: usize = 0;
+            ant.trail.truncate(0);
+            visited[which] = true;
+            ant.trail.push(which);
+
+            for _ in 0..(self.pheromones.len()-1) {
+                let v: Vec<_> = self.pheromones[which].iter().enumerate()
+                    .filter(|&(i, _)| !visited[i])
+                    .collect();
+
+                which = select_random_index(&v);
+                visited[which] = true;
+                ant.trail.push(which);
+            }
+            
+            visited.fill(false);
+        }
+    }
 }
 
 struct Instance {
@@ -127,78 +211,18 @@ impl Instance {
         }
     }
 
-    fn ils(&self, init: &Vec<usize>) -> Vec<usize> {
-        let mut rng = rand::thread_rng();
-        let mut i: usize;
-        let mut j: usize;
-        let len = init.len();
-        let init_pert_strength = 1;
-        let max_pert_strength = 2;
-        let mut pert_strength = init_pert_strength;
-        let mut cont_aux = 1;
-        let cont_max = 3000;
-        let mut solution = init.clone();
-        let mut eval_solution: i32;
-        let mut best_solution = solution.clone();
-        let mut eval_best_solution = self.evaluate(&mut best_solution);
-
-        while pert_strength < max_pert_strength {
-            solution = self.local_search(&solution);
-            eval_solution = self.evaluate(&mut solution);
-
-            if eval_best_solution > eval_solution {
-                best_solution = solution.clone();
-                eval_best_solution = eval_solution;
-                pert_strength = init_pert_strength;
-                cont_aux = 1;
-                println!("{:?} {:?}", pert_strength, eval_best_solution);
-            } else {
-                cont_aux += 1;
-                if cont_aux >= cont_max {
-                    pert_strength += 1;
-                    cont_aux = 1;
-                    println!("{:?}", pert_strength);
-                }
-            }
-            
-            for _ in 0..pert_strength {
-                i = rng.gen_range(1..len);
-                j = rng.gen_range(1..len);
-                while i == j {
-                    j = rng.gen_range(1..len);
-                }
-                let element = solution.remove(i);
-                solution.insert(j, element);
-            }
+    fn aco(&self) -> Vec<usize> {
+        let mut colony = Colony::new(self.targets.len());
+        colony.create_trails();
+        for ant in &colony.ants {
+            println!("{:?}", ant.trail);
         }
-        best_solution
+        colony.ants[0].trail.clone()
     }
-}
-
-fn interception_point(ct: f64, target_x: f64, target_y: f64, agent_x: f64, agent_y: f64, agent_speed: f64, tx_speed: f64, ty_speed:f64) -> (f64, f64) {
-    let mut dist = f64::INFINITY;
-    let mut dt: f64;
-    let mut ds: f64;
-    let mut next_target_x = target_x + tx_speed*ct;
-    let mut next_target_y = target_y + ty_speed*ct;
-    let mut prev_target_x: f64;
-    let mut prev_target_y: f64;
-
-    while dist > 10e-7 {
-        ds = distance(agent_x, agent_y, next_target_x, next_target_y);
-        dt = ds/agent_speed;
-        prev_target_x = next_target_x;
-        prev_target_y = next_target_y;
-        next_target_x = target_x + tx_speed*(ct + dt);
-        next_target_y = target_y + ty_speed*(ct + dt);
-        dist = distance(prev_target_x, prev_target_y, next_target_x, next_target_y);
-    }
-    (next_target_x, next_target_y)
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-
     if args.len() < 2 { 
         println!("Arquivo nao especificado");
         return;
@@ -208,11 +232,10 @@ fn main() {
 
     instance.set_data(mttsp_file_name);
 
-    let solution: Vec<usize> = vec![0,1,2,3,4,5,6,7,8,9,10,11,12,13];
     let start = Instant::now();
-    let local_search_solution = instance.ils(&solution);
+
+    let aco_solution = instance.aco();
+
     let time_elapsed = start.elapsed();
-    println!("{}", instance.evaluate(&local_search_solution));
-    println!("{:?}", local_search_solution);
     println!("{:?}", time_elapsed);
 }
