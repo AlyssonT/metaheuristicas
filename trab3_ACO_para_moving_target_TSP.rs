@@ -3,7 +3,6 @@ use std::io::*;
 use std::env;
 use rand::Rng;
 use rand::rngs::ThreadRng;
-use rand::thread_rng;
 use std::time::Instant;
 use rayon::prelude::*;
 
@@ -90,7 +89,7 @@ impl Colony {
             ants.push(Ant::new());
         }
         Self {
-            pheromones: vec![vec![vec![1.0; n]; n]; n-1],
+            pheromones: vec![vec![vec![1.0;n]; n]; n-1],
             ants,
         }
     }
@@ -144,15 +143,14 @@ impl Colony {
         for ant in &mut self.ants {
             ant.eval = instance.evaluate(&ant.trail);
             for i in 0..(ant.trail.len()-1) {
-                self.pheromones[i][ant.trail[i]][ant.trail[i+1]] += 1.0 / (ant.eval as f64);
+                self.pheromones[i][ant.trail[i]][ant.trail[i+1]] += 100.0 / (ant.eval as f64);
             }
         }
-        //println!("{:?}\n", self.pheromones);
     }
 
-    fn evaporation(&mut self, instance: &Instance, evaporation_factor: f64) {
+    fn evaporation(&mut self, evaporation_factor: f64) {
         for i in 0..self.pheromones.len() {
-            for j in 0..self.pheromones.len()+1 {
+            for j in 0..self.pheromones.len() {
                 for k in 0..self.pheromones.len()+1 {
                     self.pheromones[i][j][k] *= 1.0 - evaporation_factor;
                 }
@@ -305,7 +303,7 @@ impl Instance {
         let mut eval_best = i64::MAX;
         for _ in 0..max_gen {
             colony.create_trails(&self, alfa, beta);
-            colony.evaporation(&self, evaporation_factor);
+            colony.evaporation(evaporation_factor);
             colony.reinforcement(&self);
             for ant in &colony.ants { 
                 if ant.eval < eval_best {
@@ -320,7 +318,7 @@ impl Instance {
 }
 
 fn main() {
-    let mut rng = rand::thread_rng();
+    //let mut rng = rand::thread_rng();
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 { 
         println!("Arquivo nao especificado");
@@ -336,11 +334,11 @@ fn main() {
     let mut best_eval = i64::MAX;
     let mut better = vec![(1 as usize, 1000 as usize, 1.0, 1.0, 1.0)];
     for i in 0..1 {
-        let n_ants = 1000000;
-        let max_gen = 1;
-        let alfa = 1.5;
-        let beta = 7.5;
-        let evaporation_factor = 0.55;
+        let n_ants = 128000;
+        let max_gen = 16;
+        let alfa = 1.0;
+        let beta = 5.0;
+        let evaporation_factor = 0.05;
         aco_solution = instance.aco(n_ants, max_gen, alfa, beta, evaporation_factor);
         let aco_eval = instance.evaluate(&aco_solution);
         if best_eval >= aco_eval {
@@ -350,7 +348,7 @@ fn main() {
         println!("{}",i);
     }
     println!("{:?} {}", better, best_eval);
-    let sa_solution = instance.ils(&(0..instance.targets.len()).collect());
+    let sa_solution = instance.ils(&aco_solution);
     let time_elapsed = start.elapsed();
     println!("ACO: {:?}", aco_solution);
     println!("{}", instance.evaluate(&aco_solution));
