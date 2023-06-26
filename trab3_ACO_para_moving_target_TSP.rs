@@ -152,7 +152,7 @@ impl Colony {
         for i in 0..self.pheromones.len() {
             for j in 0..self.pheromones.len() {
                 for k in 0..self.pheromones.len()+1 {
-                    self.pheromones[i][j][k] *= 1.0 - evaporation_factor;
+                    self.pheromones[i][j][k] = self.pheromones[i][j][k]*(1.0 - evaporation_factor) + f64::EPSILON;
                 }
             }
         }
@@ -290,6 +290,7 @@ impl Instance {
                 while i == j {
                     j = rng.gen_range(1..len);
                 }
+                if i > j { (i,j) = (j,i); }
                 let element = solution.remove(i);
                 solution.insert(j, element);
             }
@@ -313,7 +314,7 @@ impl Instance {
                 }
             }
         }
-        best_trail
+        self.local_search(&best_trail)
     }
 }
 
@@ -335,7 +336,7 @@ fn main() {
     let mut better = vec![(1 as usize, 1000 as usize, 1.0, 1.0, 1.0)];
     for i in 0..1 {
         let n_ants = 128000;
-        let max_gen = 16;
+        let max_gen = 8;
         let alfa = 1.0;
         let beta = 5.0;
         let evaporation_factor = 0.05;
@@ -348,11 +349,11 @@ fn main() {
         println!("{}",i);
     }
     println!("{:?} {}", better, best_eval);
-    let sa_solution = instance.ils(&aco_solution);
+    // let sa_solution = instance.ils(&aco_solution);
     let time_elapsed = start.elapsed();
     println!("ACO: {:?}", aco_solution);
     println!("{}", instance.evaluate(&aco_solution));
-    println!("SA: {:?}", sa_solution);
-    println!("{}", instance.evaluate(&sa_solution));
+    // println!("SA: {:?}", sa_solution);
+    // println!("{}", instance.evaluate(&sa_solution));
     println!("{:?}", time_elapsed);
 }
