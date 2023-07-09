@@ -89,14 +89,14 @@ impl Colony {
             ants.push(Ant::new());
         }
         Self {
-            pheromones: vec![vec![vec![1.5;n]; n]; n-1],
+            pheromones: vec![vec![vec![1.5; n]; n]; n-1],
             ants,
         }
     }
 
     fn create_trails(&mut self, instance: &Instance, alfa: f64, beta: f64, q0: f64) {
         self.ants.par_iter_mut().for_each(|ant| {
-            let mut visited = vec![false; self.pheromones.len()+1];
+            let mut visited = vec![false; self.pheromones.len() + 1];
             let mut rng = rand::thread_rng();
             let mut which: usize = 0;
             let mut current_time = 0.0;
@@ -105,13 +105,13 @@ impl Colony {
             visited[which] = true;
             ant.trail.push(which);
     
-            for _ in 0..self.pheromones.len() {
-                let step = ant.trail.len()-1;
-                let mut v: Vec<_> = self.pheromones[step][which].iter().enumerate()
+            for i in 0..self.pheromones.len() {
+                let mut v: Vec<_> = self.pheromones[i][which].iter().enumerate()
                     .filter(|&(i, _)| !visited[i])
                     .map(|(i, &value)| (i, value))
                     .collect();
-                let mut sum_prob = 0.0;        
+                let mut sum_prob = 0.0;
+                if v.is_empty() {break;}
                 for i in 0..v.len() {
                     let inter_point = interception_point(current_time, instance.targets[v[i].0].x, instance.targets[v[i].0].y,
                         instance.targets[which].x + current_time*instance.targets[which].x_speed, instance.targets[which].y + current_time*instance.targets[which].y_speed, instance.agent_speed,
@@ -130,8 +130,7 @@ impl Colony {
                 let q = rng.gen_range(0.0..1.0);
                 if q < q0 {
                     which = select_random_index(&v, &mut rng);
-                }
-                else {
+                } else {
                     which = v[rng.gen_range(0..v.len())].0;
                 }
 
@@ -151,16 +150,16 @@ impl Colony {
         for ant in &mut self.ants {
             ant.eval = instance.evaluate(&ant.trail);
             for i in 0..(ant.trail.len()-1) {
-                self.pheromones[i][ant.trail[i]][ant.trail[i+1]] += 100.0 / (ant.eval as f64);
+                self.pheromones[i][ant.trail[i]][ant.trail[i+1]] += 1.0 / (ant.eval as f64);
             }
         }
     }
 
     fn evaporation(&mut self, evaporation_factor: f64) {
-        self.pheromones.par_iter_mut().for_each(|matrix| {
-            for i in 0..matrix.len() {
-                for j in 0..matrix.len() {
-                    matrix[i][j] = matrix[i][j]*(1.0 - evaporation_factor) + f64::EPSILON;
+        self.pheromones.par_iter_mut().for_each(|v| {
+            for i in 0..v.len() {  
+                for j in 0..v.len() {
+                    v[i][j] = v[i][j]*(1.0 - evaporation_factor) + f64::EPSILON;
                 }
             }
         })
@@ -226,7 +225,7 @@ impl Instance {
             agent_x, agent_y, self.agent_speed, self.targets[solution[0]].x_speed, self.targets[solution[0]].y_speed
         );
         evaluation += distance(agent_x, agent_y, interception_point_origin.0, interception_point_origin.1);
-        evaluation as i64
+        evaluation.round() as i64
     }
 
     fn local_search(&self, init: &Vec<usize>) -> Vec<usize> {
@@ -239,13 +238,13 @@ impl Instance {
         loop {
             for i in 1..size-1 {
                 for j in i+1..size {
-                    (solution[i], solution[j]) = (solution[j], solution[i]);
+                    solution[i..=j].reverse();
                     eval_temp = self.evaluate(&solution);
                     if eval_temp < eval_better_option {
                         better_option = solution.clone();
                         eval_better_option = eval_temp;
                     }
-                    (solution[i], solution[j]) = (solution[j], solution[i]);
+                    solution[i..=j].reverse();
                 }
             }
             if eval_better_option < eval_first {
@@ -259,37 +258,26 @@ impl Instance {
         }
     }
 
-    fn ils(&self, init: &Vec<usize>) -> Vec<usize> {
+    fn ils(&self, init: &Vec<usize>, after_aco: bool) -> Vec<usize> {
         let mut rng = rand::thread_rng();
+        let n_iter = if after_aco {15} else {50};
         let mut i: usize;
         let mut j: usize;
         let len = init.len();
-        let init_pert_strength = 1;
-        let max_pert_strength = 4;
-        let mut pert_strength = init_pert_strength;
-        let mut cont_aux = 1;
-        let cont_max = 20 + (init.len() as f64/4.0) as usize;
+        let pert_strength = if init.len() > 30 {(init.len() as f64 * 0.2).ceil() as usize} else {3};
         let mut solution = init.clone();
         let mut eval_solution: i64;
         let mut best_solution = solution.clone();
         let mut eval_best_solution = self.evaluate(&mut best_solution);
 
-        while pert_strength < max_pert_strength {
+        for k in 0..n_iter {
+            println!("{}", k);
             solution = self.local_search(&solution);
             eval_solution = self.evaluate(&mut solution);
+
             if eval_best_solution > eval_solution {
                 best_solution = solution.clone();
                 eval_best_solution = eval_solution;
-                pert_strength = init_pert_strength;
-                cont_aux = 1;
-                println!("{:?} {:?}", pert_strength, eval_best_solution);
-            } else {
-                cont_aux += 1;
-                if cont_aux >= cont_max {
-                    pert_strength += 1;
-                    cont_aux = 0;
-                    println!("{}", pert_strength);
-                }
             }
             
             for _ in 0..pert_strength {
@@ -298,7 +286,6 @@ impl Instance {
                 while i == j {
                     j = rng.gen_range(1..len);
                 }
-                if i > j { (i,j) = (j,i); }
                 let element = solution.remove(i);
                 solution.insert(j, element);
             }
@@ -322,48 +309,151 @@ impl Instance {
                 }
             }
         }
-        self.local_search(&best_trail)
+        best_trail
     }
 }
 
 fn main() {
-    let mut rng = rand::thread_rng();
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 { 
-        println!("Arquivo nao especificado");
-        return;
-    }
-    let mut instance = Instance::new();
-    let mttsp_file_name = args[1].as_str();
+    // let mut rng = rand::thread_rng();
+    // let args: Vec<String> = env::args().collect();
+    // if args.len() < 2 { 
+    //     println!("Arquivo nao especificado");
+    //     return;
+    // }
+    // let mut instance = Instance::new();
+    // let mttsp_file_name = args[1].as_str();
 
-    instance.set_data(mttsp_file_name);
+    // instance.set_data(mttsp_file_name);
+    let file_order = vec![
+        // "burma14-zero.mttsp",
+        // "burma14-max1.mttsp",
+        // "burma14-max10.mttsp",
+        // "burma14-max100.mttsp",
+        // "burma14-same_dir.mttsp",
+        // "berlin52-zero.mttsp",
+        // "berlin52-max1.mttsp",
+        // "berlin52-max10.mttsp",
+        // "berlin52-max100.mttsp",
+        // "berlin52-same_dir.mttsp",
+        "st70-zero.mttsp",
+        "st70-max1.mttsp",
+        "st70-max10.mttsp",
+        "st70-max100.mttsp",
+        "st70-same_dir.mttsp",
+        "gr120-zero.mttsp",
+        "gr120-max1.mttsp",
+        "gr120-max10.mttsp",
+    ];
 
-    let start = Instant::now();
-    let mut aco_solution: Vec<usize> = vec![];
-    let mut best_eval = i64::MAX;
-    let mut better = vec![(1 as usize, 1000 as usize, 1.0, 1.0, 1.0, 1.0)];
-    for i in 0..1 {
-        let n_ants = 1500;
-        let max_gen = 200;
-        let alfa = 1.0;
-        let beta = 5.0;
-        let q0 = 0.95;
-        let evaporation_factor = 0.1;
-        aco_solution = instance.aco(n_ants, max_gen, alfa, beta, evaporation_factor, q0);
-        let aco_eval = instance.evaluate(&aco_solution);
-        if best_eval >= aco_eval {
-            best_eval = aco_eval;
-            better.push((n_ants, max_gen, alfa, beta, evaporation_factor, q0));
+    let mut results: Vec<String> = vec![];
+
+    let n_ants = 3000;
+    let max_gen = 200;
+    let alfa = 1.0;
+    let beta = 5.0;
+    let q0 = 0.96;
+    let evaporation_factor = 0.1;
+    
+    let mut file = match File::create("RESULTS-zero5.txt") {
+        Ok(file) => file,
+        Err(err) => panic!("Erro ao criar o arquivo: {}", err),
+    };
+    for f in file_order {
+        let mut instance = Instance::new();
+        instance.set_data(f);
+
+        let mut aco_solution: Vec<usize>;
+        let mut aco_eval: i64;
+        let mut aco_ils_solution: Vec<usize>;
+        let mut aco_ils_eval: i64;
+        let mut ils_solution: Vec<usize>;
+        let mut ils_eval: i64;
+
+        match file.write_all(format!("--------------{}-------------\n", f).as_bytes()) {
+            Ok(()) => (),
+            Err(_) => panic!("Nao consegui escrever no arquivo"),
         }
-        println!("{}",i);
-        println!("{:?}", better[better.len()-1]);
+        for _ in 0..5 {
+            let start = Instant::now();
+            aco_solution = instance.aco(n_ants, max_gen, alfa, beta, evaporation_factor, q0);
+            let end_aco = start.elapsed();
+            
+            aco_ils_solution = instance.ils(&aco_solution, true);
+            let end_aco_ils = start.elapsed();
+
+            let start_ils = Instant::now();
+            ils_solution = instance.ils(&(0..aco_solution.len()).collect(), false);
+            let end_ils = start_ils.elapsed();
+
+            aco_eval = instance.evaluate(&aco_solution);
+            aco_ils_eval = instance.evaluate(&aco_ils_solution);
+            ils_eval = instance.evaluate(&ils_solution);
+
+            // results.push(format!("ACO EVAL: {}, TIME: {:?}\n", aco_eval, end_aco));
+            // results.push(format!("ACO+ils EVAL: {}, TIME: {:?}\n", aco_ils_eval, end_aco_ils));
+            // results.push(format!("ils EVAL: {}, TIME: {:?}\n\n", ils_eval, end_ils));
+            match file.write_all(format!("ACO EVAL: {}, TIME: {:?}\n", aco_eval, end_aco).as_bytes()) {
+                Ok(()) => (),
+                Err(_) => panic!("Nao consegui escrever no arquivo"),
+            }
+            match file.write_all(format!("ACO+ils EVAL: {}, TIME: {:?}\n", aco_ils_eval, end_aco_ils).as_bytes()) {
+                Ok(()) => (),
+                Err(_) => panic!("Nao consegui escrever no arquivo"),
+            }
+            match file.write_all(format!("ils EVAL: {}, TIME: {:?}\n\n", ils_eval, end_ils).as_bytes()) {
+                Ok(()) => (),
+                Err(_) => panic!("Nao consegui escrever no arquivo"),
+            }
+            
+            println!("ACO EVAL: {}, TIME: {:?}\n", aco_eval, end_aco);
+            println!("ACO+ils EVAL: {}, TIME: {:?}\n", aco_ils_eval, end_aco_ils);
+            println!("ils EVAL: {}, TIME: {:?}\n", ils_eval, end_ils);
+        }
     }
-    println!("{:?} {}", better, best_eval);
-    let sa_solution = instance.ils(&(0..instance.targets.len()).collect());
-    let time_elapsed = start.elapsed();
-    println!("ACO: {:?}", aco_solution);
-    println!("{}", instance.evaluate(&aco_solution));
-    println!("SA: {:?}", sa_solution);
-    println!("{}", instance.evaluate(&sa_solution));
-    println!("{:?}", time_elapsed);
+
+    
+
+    // for s in results {
+        // match file.write_all(s.as_bytes()) {
+        //     Ok(()) => (),
+        //     Err(_) => panic!("Nao consegui escrever no arquivo"),
+        // }
+    // }
+
+    // let mut start = Instant::now();
+    // let mut aco_solution: Vec<usize> = vec![];
+    // let mut best_eval = i64::MAX;
+    // let mut better = vec![(1 as usize, 1000 as usize, 1.0, 1.0, 1.0, 1.0)];
+    // for i in 0..1 {
+    //     let n_ants = 3000;
+    //     let max_gen = 200;
+    //     let alfa = 1.0;
+    //     let beta = 5.0;
+    //     let q0 = 0.96;
+    //     let evaporation_factor = 0.1;
+    //     aco_solution = instance.aco(n_ants, max_gen, alfa, beta, evaporation_factor, q0);
+    //     let aco_eval = instance.evaluate(&aco_solution);
+    //     if best_eval >= aco_eval {
+    //         best_eval = aco_eval;
+    //         better.push((n_ants, max_gen, alfa, beta, evaporation_factor, q0));
+    //     }
+    //     println!("{}",i);
+    //     println!("{:?}", better[better.len()-1]);
+    // }
+    // println!("{:?} {}", better, best_eval);
+    // let end_aco = start.elapsed();
+    // let sa_solution = instance.sa(&aco_solution, 4.0, 0.9995, 0.05, aco_solution.len()*2);
+    // let end_aco_sa = start.elapsed();
+    // start = Instant::now();
+    // let sa = instance.sa(&(0..aco_solution.len()).collect(), 10000.0, 0.9995, 0.05, aco_solution.len()*2);
+    // let end_sa = start.elapsed();
+    // println!("ACO: {:?}", aco_solution);
+    // println!("{:?}", end_aco);
+    // println!("{}", instance.evaluate(&aco_solution));
+    // println!("SA + ACO: {:?}", sa_solution);
+    // println!("{:?}", end_aco_sa);
+    // println!("{}", instance.evaluate(&sa_solution));
+    // println!("SA: {:?}", sa_solution);
+    // println!("{:?}", end_sa);
+    // println!("{}", instance.evaluate(&sa));
 }
